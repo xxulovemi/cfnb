@@ -23,7 +23,7 @@
 - 🚀 [我要部署](#-部署步骤)（Windows / Linux 命令对照）
 - 🔐 [我要获取 Token](#-获取必要令牌重要)（GitHub / Cloudflare / WxPusher 三合一教程）
 - ⚙️ [我要调整参数](#%EF%B8%8F-配置说明完整参数详解)
-- ☁️ [我要配置 Cloudflare DNS](#%EF%B8%8F-配置-cloudflare-dns-自动更新)
+- ☁️ [我要配置 Cloudflare DNS](#-配置-cloudflare-dns-自动更新)
 - 📤 [我要配置 GitHub 同步](#-配置-github-自动同步)
 - 🔗 [对接 EdgeTunnel 指南](#-%E5%AF%B9%E6%8E%A5-edgetunnel-20-%E6%8C%87%E5%8D%97)
 - ❓ [常见问题](#-常见问题)
@@ -88,11 +88,6 @@
 2. **配置各项令牌（见下一节）**  
    根据需求获取并填写 GitHub Token、Cloudflare API Token 和 WxPusher 凭证。
 
-3. **（可选）关闭不需要的功能**  
-   - 无需微信通知：`config.json` 中设 `ENABLE_WXPUSHER: false`  
-   - 无需 GitHub 推送：`config.json` 中设 `GITHUB_SYNC_MAX_RETRIES: 0`  
-   - 无需 Cloudflare DNS 更新：`config.json` 中设 `CF_ENABLED: false`
-
 ---
 
 ### 🔐 获取必要令牌（重要）
@@ -108,34 +103,58 @@
 | **5.** Generate token，**立即复制保存** | **5.** Zone ID 在域名概览页右侧“API”栏目复制 | **5.** 公众号菜单“我的”→“我的UID”获取 UID |
 | 填入 `git_sync.ps1` / `git_sync.sh` 的 `github_token` | 填入 `config.json` 的 `CF_API_TOKEN` 和 `CF_ZONE_ID` | 填入 `config.json` 的 `WXPUSHER_APP_TOKEN` 和 `WXPUSHER_UIDS` |
 
-> 💡 若不需要某项功能，可跳过对应步骤或在配置中关闭开关。
+> 💡 若不需要某项功能，可跳过对应步骤或在配置中关闭开关：  
+> - 无需微信通知：`config.json` 中设 `ENABLE_WXPUSHER: false`  
+> - 无需 GitHub 推送：`config.json` 中设 `GITHUB_SYNC_MAX_RETRIES: 0`  
+> - 无需 Cloudflare DNS 更新：`config.json` 中设 `CF_ENABLED: false`
 
 ---
 
 ### Windows 部署
 
-| 步骤 | 操作 |
-| :--- | :--- |
-| **启动管理员 PowerShell** | 按 `Win + X`，选择 **“Windows PowerShell (管理员)”** 或 **“终端 (管理员)”** |
-| **进入项目目录** | `cd "C:\你的项目路径\cfnb"` |
-| **解除执行限制（如需要）** | `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` |
-| **运行部署脚本** | `.\setup.ps1` |
-| **编辑推送脚本** | 编辑 `git_sync.ps1`，填入 GitHub 令牌等信息 |
-| **测试运行** | `python main.py` |
+以管理员身份打开 **PowerShell**，逐行执行以下命令：
 
-脚本自动完成：安装 Python/Git/curl、requests 库、创建 .gitignore、配置计划任务（下个整 15 分开始，无限期重复）。
+```powershell
+# 1. 进入项目目录
+cd "C:\你的项目路径\cfnb"
+
+# 2. 若提示脚本禁用，临时绕过（可选）
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+# 3. 运行部署脚本
+.\setup.ps1
+
+# 4. 编辑推送脚本，填入 GitHub 令牌等信息
+notepad git_sync.ps1
+
+# 5. 测试运行
+python main.py
+```
+
+脚本会自动安装依赖、创建 .gitignore 并配置计划任务（下个整15分开始，无限期重复）。
 
 ### Linux 部署
 
-| 步骤 | 操作 |
-| :--- | :--- |
-| **进入项目目录** | `cd /path/to/cfnb` |
-| **赋予执行权限** | `chmod +x setup.sh` |
-| **运行部署脚本** | `sudo ./setup.sh` |
-| **编辑推送脚本** | 编辑 `git_sync.sh`，填入 GitHub 令牌等信息 |
-| **测试运行** | `python3 main.py` |
+在终端中逐行执行以下命令：
 
-脚本自动完成：检测包管理器安装 Python3/pip/Git/curl、requests 库、创建 .gitignore、配置 cron 定时任务（整点 15 分对齐）。
+```bash
+# 1. 进入项目目录
+cd /path/to/cfnb
+
+# 2. 赋予执行权限
+chmod +x setup.sh
+
+# 3. 运行部署脚本（需要 sudo 安装软件包）
+sudo ./setup.sh
+
+# 4. 编辑推送脚本，填入 GitHub 令牌等信息
+nano git_sync.sh
+
+# 5. 测试运行
+python3 main.py
+```
+
+脚本会自动安装依赖、创建 .gitignore 并配置 cron 定时任务（整点15分对齐）。
 
 <details>
 <summary>📝 手动部署详细步骤（点击展开）</summary>
@@ -197,6 +216,8 @@
 > [!NOTE]
 > 默认参数基于 **2核2G 云服务器** 测试通过。若在 **软路由、树莓派或低配 PC** 上运行，建议降低 `MAX_WORKERS`、`BANDWIDTH_WORKERS`。
 
+所有参数均位于 `config.json`，以下为逐项说明。
+
 ### 筛选模式与数量控制
 
 | 参数 | 类型 | 默认值 | 说明 |
@@ -255,7 +276,7 @@
 <details>
 <summary>🔧 高级参数（可用性 / 带宽 / 纯净度 / 并发 / 重试）</summary>
 
-### 可用性检测参数
+**可用性检测参数**
 
 | 参数 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
@@ -266,7 +287,7 @@
 | `AVAILABILITY_RETRY_MAX` | `int` | `2` | 可用性检测最大重试轮数 |
 | `AVAILABILITY_RETRY_DELAY` | `int` | `5` | 可用性检测重试间隔（秒） |
 
-### 带宽测速参数
+**带宽测速参数**
 
 | 参数 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
@@ -276,7 +297,7 @@
 | `BANDWIDTH_RETRY_DELAY` | `int` | `5` | 带宽测速重试间隔（秒） |
 | `BANDWIDTH_URL_TEMPLATE` | `string` | `"https://speed.cloudflare.com/__down?bytes={bytes}"` | 测速 URL 模板 |
 
-### 纯净度检测参数
+**纯净度检测参数**
 
 | 参数 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
@@ -288,7 +309,7 @@
 | `IP_PURITY_RETRY_DELAY` | `int` | `5` | 纯净度检测重试间隔（秒） |
 | `IP_PURITY_FALLBACK` | `boolean` | `true` | 全部失败时是否降级 |
 
-### 并发控制参数
+**并发控制参数**
 
 | 参数 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
@@ -296,7 +317,7 @@
 | `AVAILABILITY_WORKERS` | `int` | `20` | 可用性检测并发数 |
 | `BANDWIDTH_WORKERS` | `int` | `6` | 带宽测速并发数（建议不超过 10） |
 
-### 重试策略配置
+**重试策略配置**
 
 | 参数 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
@@ -317,16 +338,12 @@
 
 ## 📊 结果输出说明
 
-程序运行完成后，会在本地生成 `ip.txt` 并在同步后更新至 GitHub 链接：
-`https://raw.githubusercontent.com/你的用户名/仓库名/refs/heads/分支名/ip.txt`
+程序运行完成后，会在本地生成 `ip.txt` 文件，每行格式为 `IP地址:端口#国家代码`，例如：
 
-### 文件格式
-`ip.txt` 采用标准格式，每一行代表一个最优节点，具体格式为：
-`IP地址:端口#国家代码`
-
-> **示例：**
-> `104.16.x.x:443#US`
+> `104.16.x.x:443#US`  
 > `162.159.x.x:443#HK`
+
+若您已配置 GitHub 自动同步，该文件将自动推送至远程仓库，订阅链接请参考 [配置 GitHub 自动同步](#-配置-github-自动同步) 章节末尾。
 
 ---
 
@@ -381,7 +398,6 @@
 - 免费套餐单次批量操作最多支持 200 条记录，足够使用。
 - 若候选池中落地 IPv4 节点不足目标数量，则更新实际可用的数量，不会强制凑满。
 - 全量替换在极短时间内可能导致解析短暂为空，但对绝大多数场景无影响。
-- 若需完全避免服务中断，可自行修改代码为增量更新（只增删差异部分）。
 
 ---
 
@@ -449,7 +465,6 @@ git branch -M main
 > 💡 若不需要 GitHub 同步功能，可在 `config.json` 中设置 `GITHUB_SYNC_MAX_RETRIES: 0` 即可关闭。
 
 ---
-
 
 ## 🚀 对接 EdgeTunnel (2.0+) 指南
 
@@ -544,10 +559,8 @@ git branch -M main
 <summary>☁️ Cloudflare DNS 更新</summary>
 
 6. **Cloudflare DNS 更新失败**  
-   - 检查 `CF_API_TOKEN` 是否有效且具有 Zone:DNS:Edit 权限。
-   - 检查 `CF_ZONE_ID` 是否正确。
-   - 检查 `CF_DNS_RECORD_NAME` 是否为完整的子域名且已托管在 Cloudflare。
-   - 脚本自带 5 次重试机制，若全部失败会通过微信通知。
+   - 检查 `CF_API_TOKEN` 权限、`CF_ZONE_ID`、`CF_DNS_RECORD_NAME` 是否正确。  
+   - 程序内置重试机制，全部失败时会通过微信通知（如已启用）。
 
 7. **为什么我的 DNS 记录数量少于 `GLOBAL_TOP_N`？**  
    如果您启用了 `FILTER_IPV6_AVAILABILITY`，且候选池中落地 IPv4 的节点总数不足目标数量，则 DNS 只会更新实际可用的节点数。这是正常现象，您可以通过增加 `BANDWIDTH_CANDIDATES` 来扩大候选池。
