@@ -10,7 +10,7 @@
     "PER_COUNTRY_TOP_N": 1,
     "_comment_PER_COUNTRY_TOP_N": "分国家模式下每个国家保留的节点数量",
 
-    "BANDWIDTH_CANDIDATES": 45,
+    "BANDWIDTH_CANDIDATES": 90,
     "_comment_BANDWIDTH_CANDIDATES": "进入带宽测速的候选节点数（从TCP通过者中选取前N个）",
 
     "TCP_PROBES": 5,
@@ -31,8 +31,8 @@
     "FILTER_COUNTRIES_ENABLED": false,
     "_comment_FILTER_COUNTRIES_ENABLED": "是否启用国家过滤（仅保留指定国家的节点）",
 
-    "ALLOWED_COUNTRIES": ["US", "HK"],
-    "_comment_ALLOWED_COUNTRIES": "允许的国家代码列表（如 US, HK, JP），仅在 FILTER_COUNTRIES_ENABLED=true 时生效",
+    "ALLOWED_COUNTRIES": ["US"],
+    "_comment_ALLOWED_COUNTRIES": "允许的国家代码列表（如 US, JP），仅在 FILTER_COUNTRIES_ENABLED=true 时生效",
 
     "ENABLE_WXPUSHER": true,
     "_comment_ENABLE_WXPUSHER": "是否启用 WxPusher 微信通知",
@@ -85,9 +85,6 @@
     "TEST_AVAILABILITY": true,
     "_comment_TEST_AVAILABILITY": "是否对候选节点进行可用性二次筛选（API检测）",
 
-    "FILTER_IPV6_AVAILABILITY": true,
-    "_comment_FILTER_IPV6_AVAILABILITY": "【修改后语义】是否在 DNS 更新时过滤掉落地为 IPv6 的节点（true=过滤，false=保留）。注意：此开关不再影响 ip.txt 和带宽测速。",
-
     "AVAILABILITY_CHECK_API": "https://check-proxyip-api.cmliussss.net/check",
     "_comment_AVAILABILITY_CHECK_API": "IP 可用性检测 API 地址",
 
@@ -102,6 +99,39 @@
 
     "AVAILABILITY_RETRY_DELAY": 5,
     "_comment_AVAILABILITY_RETRY_DELAY": "可用性检测重试间隔（秒）",
+
+    "FILTER_IPV6_AVAILABILITY": true,
+    "_comment_FILTER_IPV6_AVAILABILITY": "【仅DNS】是否过滤落地为 IPv6 的节点",
+
+    "FILTER_BLOCKED_COUNTRIES_ENABLED": true,
+    "_comment_FILTER_BLOCKED_COUNTRIES_ENABLED": "【仅DNS】是否屏蔽特定国家的节点",
+
+    "BLOCKED_COUNTRIES": ["CN", "HK", "MO", "RU", "TW"],
+    "_comment_BLOCKED_COUNTRIES": "【仅DNS】需要屏蔽的国家代码列表",
+
+    "ENABLE_IP_PURITY_CHECK": true,
+    "_comment_ENABLE_IP_PURITY_CHECK": "【仅DNS】是否对节点进行纯净度检测（要求滥用评分均为 Low）",
+
+    "IP_PURITY_API": "https://api.ipapi.is/",
+    "_comment_IP_PURITY_API": "IP 纯净度检测 API 地址",
+
+    "IP_PURITY_WORKERS": 5,
+    "_comment_IP_PURITY_WORKERS": "纯净度检测的并发线程数",
+
+    "IP_PURITY_TIMEOUT": 5,
+    "_comment_IP_PURITY_TIMEOUT": "纯净度 API 读取超时（秒）",
+
+    "IP_PURITY_CONNECT_TIMEOUT": 5,
+    "_comment_IP_PURITY_CONNECT_TIMEOUT": "纯净度 API 连接超时（秒）",
+
+    "IP_PURITY_RETRY_MAX": 2,
+    "_comment_IP_PURITY_RETRY_MAX": "纯净度检测整体失败时的最大重试轮数",
+
+    "IP_PURITY_RETRY_DELAY": 5,
+    "_comment_IP_PURITY_RETRY_DELAY": "纯净度检测重试间隔（秒）",
+
+    "IP_PURITY_FALLBACK": true,
+    "_comment_IP_PURITY_FALLBACK": "纯净度检测全部失败时是否降级使用原带宽测速结果",
 
     "BANDWIDTH_SIZE_MB": 1,
     "_comment_BANDWIDTH_SIZE_MB": "带宽测速下载文件大小（MB）",
@@ -123,30 +153,6 @@
 
     "BANDWIDTH_CONNECT_TIMEOUT": 5,
     "_comment_BANDWIDTH_CONNECT_TIMEOUT": "curl 测速连接超时（秒）",
-
-    "ENABLE_IP_PURITY_CHECK": true,
-    "_comment_ENABLE_IP_PURITY_CHECK": "是否在带宽测速后对节点进行纯净度检测（要求 company.abuser_score 和 asn.abuser_score 均为 Low）",
-
-    "IP_PURITY_API": "https://api.ipapi.is/",
-    "_comment_IP_PURITY_API": "IP 纯净度检测 API 地址",
-
-    "IP_PURITY_WORKERS": 5,
-    "_comment_IP_PURITY_WORKERS": "纯净度检测的并发线程数",
-
-    "IP_PURITY_TIMEOUT": 5,
-    "_comment_IP_PURITY_TIMEOUT": "纯净度 API 读取超时（秒）",
-
-    "IP_PURITY_CONNECT_TIMEOUT": 5,
-    "_comment_IP_PURITY_CONNECT_TIMEOUT": "纯净度 API 连接超时（秒）",
-
-    "IP_PURITY_RETRY_MAX": 2,
-    "_comment_IP_PURITY_RETRY_MAX": "纯净度检测整体失败（通过率为0）时的最大重试轮数",
-
-    "IP_PURITY_RETRY_DELAY": 5,
-    "_comment_IP_PURITY_RETRY_DELAY": "纯净度检测重试间隔（秒）",
-
-    "IP_PURITY_FALLBACK": true,
-    "_comment_IP_PURITY_FALLBACK": "纯净度检测多次重试后仍全部失败时是否降级使用原带宽测速结果",
 
     "MAX_WORKERS": 150,
     "_comment_MAX_WORKERS": "TCP 并发测试的最大线程数",

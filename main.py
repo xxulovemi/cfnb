@@ -41,14 +41,14 @@ def load_config():
         "USE_GLOBAL_MODE": True,
         "GLOBAL_TOP_N": 15,
         "PER_COUNTRY_TOP_N": 1,
-        "BANDWIDTH_CANDIDATES": 45,
+        "BANDWIDTH_CANDIDATES": 90,
         "TCP_PROBES": 5,
         "MIN_SUCCESS_RATE": 1.0,
         "TIMEOUT": 2.5,
         "SOCKET_DEFAULT_TIMEOUT": 5,
         "PROGRESS_PRINT_INTERVAL": 1,
         "FILTER_COUNTRIES_ENABLED": False,
-        "ALLOWED_COUNTRIES": ["US", "HK"],
+        "ALLOWED_COUNTRIES": ["US"],
         "ENABLE_WXPUSHER": True,
         "WXPUSHER_APP_TOKEN": "your_app_token_here",
         "WXPUSHER_UIDS": ["your_uid_here"],
@@ -70,19 +70,14 @@ def load_config():
         "FETCH_CONNECT_TIMEOUT": 5,
         "OUTPUT_FILE": "ip.txt",
         "TEST_AVAILABILITY": True,
-        "FILTER_IPV6_AVAILABILITY": True,
         "AVAILABILITY_CHECK_API": "https://check-proxyip-api.cmliussss.net/check",
         "AVAILABILITY_TIMEOUT": 5,
         "AVAILABILITY_CONNECT_TIMEOUT": 5,
         "AVAILABILITY_RETRY_MAX": 2,
         "AVAILABILITY_RETRY_DELAY": 5,
-        "BANDWIDTH_SIZE_MB": 1,
-        "BANDWIDTH_TIMEOUT": 5,
-        "BANDWIDTH_RETRY_MAX": 2,
-        "BANDWIDTH_RETRY_DELAY": 5,
-        "BANDWIDTH_URL_TEMPLATE": "https://speed.cloudflare.com/__down?bytes={bytes}",
-        "BANDWIDTH_PROCESS_BUFFER": 2,
-        "BANDWIDTH_CONNECT_TIMEOUT": 5,
+        "FILTER_IPV6_AVAILABILITY": True,
+        "FILTER_BLOCKED_COUNTRIES_ENABLED": True,
+        "BLOCKED_COUNTRIES": ["CN", "HK", "MO", "RU", "TW"],
         "ENABLE_IP_PURITY_CHECK": True,
         "IP_PURITY_API": "https://api.ipapi.is/",
         "IP_PURITY_WORKERS": 5,
@@ -91,6 +86,13 @@ def load_config():
         "IP_PURITY_RETRY_MAX": 2,
         "IP_PURITY_RETRY_DELAY": 5,
         "IP_PURITY_FALLBACK": True,
+        "BANDWIDTH_SIZE_MB": 1,
+        "BANDWIDTH_TIMEOUT": 5,
+        "BANDWIDTH_RETRY_MAX": 2,
+        "BANDWIDTH_RETRY_DELAY": 5,
+        "BANDWIDTH_URL_TEMPLATE": "https://speed.cloudflare.com/__down?bytes={bytes}",
+        "BANDWIDTH_PROCESS_BUFFER": 2,
+        "BANDWIDTH_CONNECT_TIMEOUT": 5,
         "MAX_WORKERS": 150,
         "AVAILABILITY_WORKERS": 5,
         "BANDWIDTH_WORKERS": 5,
@@ -98,7 +100,7 @@ def load_config():
         "DNS_UPDATE_RETRY_DELAY": 5,
         "GITHUB_SYNC_MAX_RETRIES": 3,
         "GITHUB_SYNC_RETRY_DELAY": 5,
-        "GIT_SYNC_PROCESS_TIMEOUT": 180
+        "GIT_SYNC_PROCESS_TIMEOUT": 180,
     }
 
     # 用默认值补全缺失字段
@@ -145,19 +147,14 @@ FETCH_TIMEOUT = cfg["FETCH_TIMEOUT"]
 FETCH_CONNECT_TIMEOUT = cfg["FETCH_CONNECT_TIMEOUT"]
 OUTPUT_FILE = cfg["OUTPUT_FILE"]
 TEST_AVAILABILITY = cfg["TEST_AVAILABILITY"]
-FILTER_IPV6_AVAILABILITY = cfg["FILTER_IPV6_AVAILABILITY"]
 AVAILABILITY_CHECK_API = cfg["AVAILABILITY_CHECK_API"]
 AVAILABILITY_TIMEOUT = cfg["AVAILABILITY_TIMEOUT"]
 AVAILABILITY_CONNECT_TIMEOUT = cfg["AVAILABILITY_CONNECT_TIMEOUT"]
 AVAILABILITY_RETRY_MAX = cfg["AVAILABILITY_RETRY_MAX"]
 AVAILABILITY_RETRY_DELAY = cfg["AVAILABILITY_RETRY_DELAY"]
-BANDWIDTH_SIZE_MB = cfg["BANDWIDTH_SIZE_MB"]
-BANDWIDTH_TIMEOUT = cfg["BANDWIDTH_TIMEOUT"]
-BANDWIDTH_RETRY_MAX = cfg["BANDWIDTH_RETRY_MAX"]
-BANDWIDTH_RETRY_DELAY = cfg["BANDWIDTH_RETRY_DELAY"]
-BANDWIDTH_URL_TEMPLATE = cfg["BANDWIDTH_URL_TEMPLATE"]
-BANDWIDTH_PROCESS_BUFFER = cfg["BANDWIDTH_PROCESS_BUFFER"]
-BANDWIDTH_CONNECT_TIMEOUT = cfg["BANDWIDTH_CONNECT_TIMEOUT"]
+FILTER_IPV6_AVAILABILITY = cfg["FILTER_IPV6_AVAILABILITY"]
+FILTER_BLOCKED_COUNTRIES_ENABLED = cfg["FILTER_BLOCKED_COUNTRIES_ENABLED"]
+BLOCKED_COUNTRIES = cfg["BLOCKED_COUNTRIES"]
 ENABLE_IP_PURITY_CHECK = cfg["ENABLE_IP_PURITY_CHECK"]
 IP_PURITY_API = cfg["IP_PURITY_API"]
 IP_PURITY_WORKERS = cfg["IP_PURITY_WORKERS"]
@@ -166,6 +163,13 @@ IP_PURITY_CONNECT_TIMEOUT = cfg["IP_PURITY_CONNECT_TIMEOUT"]
 IP_PURITY_RETRY_MAX = cfg["IP_PURITY_RETRY_MAX"]
 IP_PURITY_RETRY_DELAY = cfg["IP_PURITY_RETRY_DELAY"]
 IP_PURITY_FALLBACK = cfg["IP_PURITY_FALLBACK"]
+BANDWIDTH_SIZE_MB = cfg["BANDWIDTH_SIZE_MB"]
+BANDWIDTH_TIMEOUT = cfg["BANDWIDTH_TIMEOUT"]
+BANDWIDTH_RETRY_MAX = cfg["BANDWIDTH_RETRY_MAX"]
+BANDWIDTH_RETRY_DELAY = cfg["BANDWIDTH_RETRY_DELAY"]
+BANDWIDTH_URL_TEMPLATE = cfg["BANDWIDTH_URL_TEMPLATE"]
+BANDWIDTH_PROCESS_BUFFER = cfg["BANDWIDTH_PROCESS_BUFFER"]
+BANDWIDTH_CONNECT_TIMEOUT = cfg["BANDWIDTH_CONNECT_TIMEOUT"]
 MAX_WORKERS = cfg["MAX_WORKERS"]
 AVAILABILITY_WORKERS = cfg["AVAILABILITY_WORKERS"]
 BANDWIDTH_WORKERS = cfg["BANDWIDTH_WORKERS"]
@@ -539,24 +543,45 @@ def batch_update_cloudflare_dns(ip_list, ip_info=None, full_bw_results=None, tar
     # 优先使用完整测速结果 + 落地信息来构建更新列表
     dns_ip_list = []
     dns_node_list = []  # 用于打印的完整节点字符串
+    filtered_by_ipv6 = 0
+    filtered_by_country = 0
+
     if full_bw_results and ip_info:
-        # 如果需要过滤 IPv6 落地，则按速度顺序挑选落地 IPv4 的节点
-        if cfg.get("FILTER_IPV6_AVAILABILITY", False):
-            for node_str, speed in full_bw_results:
+        # 获取屏蔽国家配置
+        blocked_set = set()
+        if cfg.get("FILTER_BLOCKED_COUNTRIES_ENABLED", False):
+            blocked_set = {c.upper() for c in cfg.get("BLOCKED_COUNTRIES", [])}
+
+        for node_str, speed in full_bw_results:
+            # 1. 先过滤 IPv6 落地（如果启用）
+            if cfg.get("FILTER_IPV6_AVAILABILITY", False):
                 returned_ip = ip_info.get(node_str, "")
-                if ":" not in returned_ip:   # 落地 IPv4
-                    pure_ip = node_str.split(':')[0]
-                    dns_ip_list.append(pure_ip)
-                    dns_node_list.append(node_str)
-                if len(dns_ip_list) >= target_count:
-                    break
-            print(f"从 {len(full_bw_results)} 个测速节点中筛选出 {len(dns_ip_list)} 个落地 IPv4 节点用于 DNS 更新。")
-        else:
-            # 不过滤 IPv6，直接取前 target_count 个
-            for node_str, _ in full_bw_results[:target_count]:
-                pure_ip = node_str.split(':')[0]
-                dns_ip_list.append(pure_ip)
-                dns_node_list.append(node_str)
+                if ":" in returned_ip:   # 落地 IPv6
+                    filtered_by_ipv6 += 1
+                    continue
+
+            # 2. 再过滤屏蔽国家（如果启用）
+            if blocked_set and '#' in node_str:
+                country = node_str.split('#')[-1].upper()
+                if country in blocked_set:
+                    filtered_by_country += 1
+                    continue
+
+            pure_ip = node_str.split(':')[0]
+            dns_ip_list.append(pure_ip)
+            dns_node_list.append(node_str)
+
+            if len(dns_ip_list) >= target_count:
+                break
+
+        # 打印过滤统计
+        filter_parts = []
+        if cfg.get("FILTER_IPV6_AVAILABILITY", False):
+            filter_parts.append(f"IPv6落地过滤({filtered_by_ipv6}个)")
+        if cfg.get("FILTER_BLOCKED_COUNTRIES_ENABLED", False):
+            filter_parts.append(f"屏蔽国家过滤({filtered_by_country}个)")
+        filter_str = " + ".join(filter_parts) if filter_parts else "无过滤"
+        print(f"从 {len(full_bw_results)} 个测速节点中筛选出 {len(dns_ip_list)} 个节点用于 DNS 更新（{filter_str}）。")
 
     # 降级：若上述方法未产生任何 IP，则回退到原 ip_list
     if not dns_ip_list:
@@ -737,8 +762,9 @@ def main():
     print(f"最低成功率要求：{MIN_SUCCESS_RATE*100:.0f}%")
     print(f"IP 可用性二次筛选：{'启用' if TEST_AVAILABILITY else '禁用'}（仅对候选节点）")
     print(f"IPv6 客户端 IP 过滤（仅作用于DNS更新环节）：{'启用' if FILTER_IPV6_AVAILABILITY else '禁用'}")
+    print(f"屏蔽国家过滤（仅作用于DNS更新环节）：{'启用' if FILTER_BLOCKED_COUNTRIES_ENABLED else '禁用'}，屏蔽国家：{', '.join(BLOCKED_COUNTRIES)}")
     print(f"带宽测速候选数：{BANDWIDTH_CANDIDATES}，测速文件大小：{BANDWIDTH_SIZE_MB} MB，超时：{BANDWIDTH_TIMEOUT}s")
-    print(f"纯净度检测：{'启用' if ENABLE_IP_PURITY_CHECK else '禁用'}")
+    print(f"纯净度检测（仅作用于DNS更新环节）：{'启用' if ENABLE_IP_PURITY_CHECK else '禁用'}")
     if FILTER_COUNTRIES_ENABLED:
         print(f"国家过滤：启用，允许国家：{', '.join(ALLOWED_COUNTRIES)}")
 
@@ -792,7 +818,7 @@ def main():
     # 构建延迟映射字典，方便后续查找
     latency_map = {node: lat for node, lat, _, _ in results}
 
-    # ===== 修改区域1：分国家模式候选池构建（设想 C：公平分配名额） =====
+    # ===== 候选池构建 =====
     if USE_GLOBAL_MODE:
         candidates = [node for node, _, _, _ in results[:BANDWIDTH_CANDIDATES]]
         print(f"\nTCP 最优前 {len(candidates)} 个节点进入候选池。")
@@ -803,17 +829,14 @@ def main():
             country_nodes[country].append((node_str, lat, succ))
 
         total_countries = len(country_nodes)
-        # 每个国家分配的基础候选名额 = BANDWIDTH_CANDIDATES // 国家数，至少1个
         base_limit = max(1, BANDWIDTH_CANDIDATES // total_countries)
         candidates = []
         for country, nodes in country_nodes.items():
             nodes_sorted = sorted(nodes, key=lambda x: (-x[2], x[1]))
-            # 每个国家最多取 base_limit 个，但不能超过该国实际通过数
             limit = min(len(nodes_sorted), base_limit)
             for node_str, lat, succ in nodes_sorted[:limit]:
                 candidates.append(node_str)
         print(f"\n各国家候选池分配：共 {total_countries} 个国家，每国最多 {base_limit} 个候选，总计 {len(candidates)} 个节点进入候选池。")
-    # =============================================================
 
     if not candidates:
         print("没有候选节点，退出。")
@@ -842,46 +865,32 @@ def main():
         if USE_GLOBAL_MODE:
             final_selected = [node for node, _, _, _ in results[:GLOBAL_TOP_N]]
         else:
-            # 降级时按国家各取 PER_COUNTRY_TOP_N 个 TCP 最优节点
             final_selected = []
             for country, nodes in country_nodes.items():
                 nodes_sorted = sorted(nodes, key=lambda x: (-x[2], x[1]))
                 for node_str, _, _ in nodes_sorted[:PER_COUNTRY_TOP_N]:
                     final_selected.append(node_str)
-        pure_bw_results = []  # 用于DNS降级
+        dns_bw_results = []  # DNS 更新时无测速结果可用
     else:
-        # 6.5 纯净度过滤（带重试）
-        pure_bw_results, purity_ok = purity_filter_with_retry(bw_results)
-        if not pure_bw_results:
-            # 纯净度全失败且不允许降级
-            msg = "纯净度检测全部失败且配置为不降级，程序终止。"
-            print(msg)
-            send_wxpusher_notification(content=msg, summary="纯净度检测失败")
-            sys.exit(1)
-
-        # ===== 修改区域2：最终输出按国家独立取前 PER_COUNTRY_TOP_N 个 =====
+        # === 关键改动：ip.txt 保存未经纯净度过滤的带宽测速结果 ===
+        # 直接基于 bw_results 生成最终列表（不经过纯净度过滤）
         if USE_GLOBAL_MODE:
-            final_selected = [node for node, _ in pure_bw_results[:GLOBAL_TOP_N]]
+            final_selected = [node for node, _ in bw_results[:GLOBAL_TOP_N]]
         else:
-            # 按国家分组测速结果
             country_speed_nodes = defaultdict(list)
-            for node, speed in pure_bw_results:
+            for node, speed in bw_results:
                 country = node.split('#')[-1] if '#' in node else ''
                 if country:
                     country_speed_nodes[country].append((node, speed))
             final_selected = []
             for country, nodes in country_speed_nodes.items():
-                # 取该国速度前 PER_COUNTRY_TOP_N 个节点
                 for node, speed in nodes[:PER_COUNTRY_TOP_N]:
                     final_selected.append(node)
-            # 可选：按全局速度二次排序，使输出列表更直观
-            speed_map = {node: speed for node, speed in pure_bw_results}
+            speed_map = {node: speed for node, speed in bw_results}
             final_selected.sort(key=lambda x: speed_map.get(x, 0), reverse=True)
-        # ================================================================
 
-        # ===== 最终优选节点打印带速度和延迟 =====
-        print("\n================ 最终优选节点（基于带宽测速 + 纯净度过滤）================")
-        speed_map = {node: speed for node, speed in pure_bw_results}
+        print("\n================ 最终优选节点（基于带宽测速，未经纯净度过滤）================")
+        speed_map = {node: speed for node, speed in bw_results}
         for i, node in enumerate(final_selected, 1):
             speed = speed_map.get(node, 0)
             lat_sec = latency_map.get(node, float('inf'))
@@ -889,15 +898,26 @@ def main():
                 print(f"{i}. {node} 速度 {speed:.2f} Mbps 延迟 {lat_sec*1000:.2f} ms")
             else:
                 print(f"{i}. {node} 速度 {speed:.2f} Mbps")
-        # ======================================
 
-    # 8. 保存结果
+        # === 为 DNS 更新单独进行纯净度过滤 ===
+        dns_bw_results = bw_results  # 默认值
+        if ENABLE_IP_PURITY_CHECK:
+            print("\n[DNS 更新专属] 开始纯净度过滤...")
+            dns_bw_results, purity_ok = purity_filter_with_retry(bw_results)
+            if not dns_bw_results:
+                # 纯净度全失败且不允许降级，跳过 DNS 更新
+                msg = "纯净度检测全部失败且配置为不降级，将跳过 DNS 更新。"
+                print(f"⚠️ {msg}")
+                send_wxpusher_notification(content=msg, summary="纯净度检测失败，DNS 更新跳过")
+                dns_bw_results = []  # 空列表导致 DNS 更新降级或跳过
+
+    # 8. 保存结果到 ip.txt
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
         for node_str in final_selected:
             f.write(node_str + "\n")
     print(f"\n结果已保存到 {OUTPUT_FILE}（共 {len(final_selected)} 个节点）")
 
-    # 9. 读取 ip.txt 中的纯 IP 列表，用于 DNS 更新（作为降级备用）
+    # 9. 读取 ip.txt 中的纯 IP 列表，用于 DNS 更新降级
     ip_list = []
     try:
         with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
@@ -907,11 +927,10 @@ def main():
 
     # 10. 批量更新 Cloudflare DNS
     target_dns_count = GLOBAL_TOP_N if USE_GLOBAL_MODE else PER_COUNTRY_TOP_N
-    # 传递 latency_map 以便打印延迟
     batch_update_cloudflare_dns(
         ip_list,
         ip_info=avail_ip_info,
-        full_bw_results=pure_bw_results if 'pure_bw_results' in locals() else bw_results,
+        full_bw_results=dns_bw_results if 'dns_bw_results' in locals() else bw_results,
         target_count=target_dns_count,
         latency_map=latency_map
     )
